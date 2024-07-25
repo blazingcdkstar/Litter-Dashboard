@@ -1,10 +1,10 @@
-import pathlib
+
 
 #%% load libraries
 from dash import Dash, dcc, html, Input, Output, dash_table # pip install dash
 import dash_bootstrap_components as dbc 
 from dash.exceptions import PreventUpdate
-
+#import dash_ag_grid as dag # pip install dash-ag-grid
 
 # import data libraries
 import pandas as pd  # pip install pandas
@@ -14,6 +14,7 @@ import numpy as np    # pip install numpy
 # plotting packages
 import plotly.graph_objects as go #pip install plotly
 import plotly.express as px
+import folium  # pip install folium
 
 # load data wrangling module
 import app_data as ad
@@ -36,7 +37,7 @@ def mysum(main_category):
 
 #%% Set Variables
 # mapbox token
-mytoken = 'enter your mapbox token here'
+mytoken = 'pk.eyJ1IjoiY2RrZWxsZXIiLCJhIjoiY2x5bmFnc3J2MDQ1bTJrcHN3bWI3ajNwcyJ9.16DwzQZpCPZbBlkcZg57eA'
 
 color_discrete_map = {'Softdrinks': '#3366CC',
                             'Food': '#DC3912',
@@ -75,7 +76,7 @@ total_small_constributors = total_sanitary + total_custom_tag_1 + total_industri
 
 density_fig = px.scatter_mapbox(df_piv, lat="min_lat", lon="min_lon",    
                         color="avg_litter_pickedup", size="avg_litter_pickedup",
-                        color_continuous_scale='viridis',
+                        color_continuous_scale='teal',
                         zoom=13,
                         hover_data={'avg_litter_pickedup': True,
                                     'min_lat': False,
@@ -92,8 +93,8 @@ density_fig.update_layout(mapbox_accesstoken = mytoken)
 # create density bar chart
 df_piv_top = df_piv.nlargest(20,'avg_litter_pickedup')
 
-density_bar = px.bar(df_piv_top, x='add_blocknum_street', 
-       y= 'avg_litter_pickedup',
+density_bar = px.bar(df_piv_top, x='avg_litter_pickedup', 
+       y= 'add_blocknum_street',
        hover_data={'add_blocknum_street': True,
                    'avg_litter_pickedup': True,
                    'total_count_pickup_dates': True},
@@ -101,9 +102,27 @@ density_bar = px.bar(df_piv_top, x='add_blocknum_street',
                 'avg_litter_pickedup': 'Average Litter Picked Up',
                 'total_count_pickup_dates': 'Count of Outings'},
         color = 'total_count_pickup_dates',
-        color_continuous_scale='viridis')
+        color_continuous_scale='teal')
 
 density_bar.update_layout(yaxis_title=None, xaxis_title = None,plot_bgcolor = 'lightgrey')
+density_bar.update_layout(yaxis = dict(autorange = 'reversed'))
+
+#%% Density for at least 3 pickups
+df_piv_three = df_piv[df_piv['total_count_pickup_dates'] >= 3].nlargest(10, 'avg_litter_pickedup')
+
+density_bar_three = px.bar(df_piv_three, x='avg_litter_pickedup', 
+       y= 'add_blocknum_street',
+       hover_data={'add_blocknum_street': True,
+                   'avg_litter_pickedup': True,
+                   'total_count_pickup_dates': True},
+        labels={'add_blocknum_street': 'Street Block',
+                'avg_litter_pickedup': 'Average Litter Picked Up',
+                'total_count_pickup_dates': 'Count of Outings'},
+        color = 'total_count_pickup_dates',
+        color_continuous_scale='teal')
+
+density_bar_three.update_layout(yaxis_title=None, xaxis_title = None,plot_bgcolor = 'lightgrey')
+density_bar_three.update_layout(yaxis = dict(autorange = 'reversed'))
 
 
 
@@ -111,8 +130,6 @@ density_bar.update_layout(yaxis_title=None, xaxis_title = None,plot_bgcolor = 'l
 
 app = Dash(__name__,
                 external_stylesheets=[dbc.themes.LUX])
-
-server = app.server
 
 #%% app layout
 
@@ -296,20 +313,44 @@ app.layout = html.Div([
     html.Br(),
     html.H1('Litter Density by Street Block',
             style = {'textAlign': 'center'}),
+    
+    html.Br(),
+    
+    dbc.Row([
+        dbc.Col([
+            html.H4('Top 20 Average Litter',
+                    style = {'width': '130vh',
+                             'textAlign': 'center'})
+        ]),
+
+        dbc.Col([
+            html.H4('Top 10 Average Litter for > 2 Outings',
+                    style = {'width': '60vh',
+                             'textAlign': 'center'})
+        ]),
+    ]),
+    
 
     
 
     dbc.Row([
         dbc.Col([
             dcc.Graph(figure=density_fig,
-              style = {'width': '80vh', 'height': '70vh'},
+              style = {'width': '70vh', 'height': '70vh'},
               config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]})
         ]),
 
         dbc.Col([
             dcc.Graph(figure=density_bar,
-              style = {'width': '80vh', 'height': '70vh'},
+              style = {'width': '60vh', 'height': '70vh'},
+              config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
+                                                   "autoScale2d" "select2d", "lasso2d"]})
+        ]),
+
+        dbc.Col([
+            dcc.Graph(figure=density_bar_three,
+              style = {'width': '60vh', 'height': '70vh'},
               config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]})
         ]),
@@ -484,6 +525,5 @@ def my_bar_chart(mycategory, start_date, end_date):
 
 
 #%% Run App
-
 if __name__ == '__main__':
-    app.run_server()
+    app.run_server(debug=True, port= 5678)
