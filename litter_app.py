@@ -37,7 +37,7 @@ def mysum(main_category):
 
 #%% Set Variables
 # mapbox token
-mytoken = 'pk.eyJ1IjoiY2RrZWxsZXIiLCJhIjoiY2x5bmFnc3J2MDQ1bTJrcHN3bWI3ajNwcyJ9.16DwzQZpCPZbBlkcZg57eA'
+mytoken = 'enter your mapbox token here'
 
 color_discrete_map = {'Softdrinks': '#3366CC',
                             'Food': '#DC3912',
