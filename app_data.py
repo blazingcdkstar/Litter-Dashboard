@@ -47,13 +47,15 @@ ID 459532 is custom tagged as a hair net, and has no value in the total column i
 #######################################################                             ############################################################
 
 #%% Import Packages
-import pathlib
 
 # Data packages
 import pandas as pd
 import numpy as np
 import gc
 
+# graphing packages
+import plotly.express as px
+import matplotlib.pyplot as plt
 
 # create list of main base columns in dataset
 base_columns = ['id', 'verification','phone', 'date_taken', 'date_taken_date', 'date_taken_yrmth',
@@ -64,14 +66,8 @@ base_columns = ['id', 'verification','phone', 'date_taken', 'date_taken_date', '
 ###################################################### < Step 2: Import Data > #################################################################
 ######################################################                         #################################################################
 
-#%% set path
-PATH = pathlib.Path(__file__).parent
-DATA_PATH = PATH.joinpath("data").resolve()
-
-
 #%% Import Data
-#litter = pd.read_csv('Data\OpenLitterMap.csv')
-litter = pd.read_csv(DATA_PATH.joinpath('OpenLitterMap.csv'))
+litter = pd.read_csv('Data\OpenLitterMap.csv')
 
 
 #%% make dates date data type
@@ -156,7 +152,7 @@ litter_base = litter[[c for c in litter.columns if c in base_columns]]
 
 litter_customtag = litter[['id', 'custom_tag_1']].dropna()
 litter_customtag = litter_customtag.loc[litter_customtag['custom_tag_1'] != 'category:fastfood']
-litter_customtag['main_category'] = 'custom_tag_1'
+litter_customtag['main_category'] = 'custom_litter_type'
 litter_customtag['value'] = 1.0
 
 litter_customtag = litter_customtag.rename(columns={'custom_tag_1':'sub_category'})

@@ -37,7 +37,7 @@ def mysum(main_category):
 
 #%% Set Variables
 # mapbox token
-mytoken = 'enter your mapbox token here'
+mytoken = 'Enter your mapbox key here.'
 
 color_discrete_map = {'Softdrinks': '#3366CC',
                             'Food': '#DC3912',
@@ -46,7 +46,7 @@ color_discrete_map = {'Softdrinks': '#3366CC',
                             'Alcohol': '#990099',
                             'Coffee': '#0099C6',
                             'Sanitary': '#DD4477',
-                            'Custom_Tag_1': '#66AA00',
+                            'Custom_Litter_Type': '#66AA00',
                             'Industrial': '#B82E2E'}
 
 # get totals by main category
@@ -61,51 +61,14 @@ total_smoking = mysum('Smoking')
 total_alcohol = mysum('Alcohol')
 total_coffee = mysum('Coffee')
 total_sanitary = mysum('Sanitary')
-total_custom_tag_1 = mysum('Custom_Tag_1')
+total_custom = mysum('Custom_Litter_Type')
 total_industrial = mysum('Industrial')
 total_dogshit = mysum('Dogshit')
 
-total_small_constributors = total_sanitary + total_custom_tag_1 + total_industrial + total_dogshit
+total_small_constributors = total_sanitary + total_custom + total_industrial + total_dogshit
 
 
 
-
-#%% Create Static Maps
-
-# create density map
-
-density_fig = px.scatter_mapbox(df_piv, lat="min_lat", lon="min_lon",    
-                        color="avg_litter_pickedup", size="avg_litter_pickedup",
-                        color_continuous_scale='teal',
-                        zoom=13,
-                        hover_data={'avg_litter_pickedup': True,
-                                    'min_lat': False,
-                                    'min_lon': False,
-                                    'add_blocknum_street': True,
-                                    'total_count_pickup_dates': True},
-                        labels = {'add_blocknum_street': 'Street Block',
-                                  'total_count_pickup_dates': 'Count of Outings',
-                                  'avg_litter_pickedup': 'Average Litter Picked Up'}
-                        )
-density_fig.update_layout(legend_title_text = 'Average Litter Picked Up per Outing')
-density_fig.update_layout(mapbox_accesstoken = mytoken)
-
-# create density bar chart
-df_piv_top = df_piv.nlargest(20,'avg_litter_pickedup')
-
-density_bar = px.bar(df_piv_top, x='avg_litter_pickedup', 
-       y= 'add_blocknum_street',
-       hover_data={'add_blocknum_street': True,
-                   'avg_litter_pickedup': True,
-                   'total_count_pickup_dates': True},
-        labels={'add_blocknum_street': 'Street Block',
-                'avg_litter_pickedup': 'Average Litter Picked Up',
-                'total_count_pickup_dates': 'Count of Outings'},
-        color = 'total_count_pickup_dates',
-        color_continuous_scale='teal')
-
-density_bar.update_layout(yaxis_title=None, xaxis_title = None,plot_bgcolor = 'lightgrey')
-density_bar.update_layout(yaxis = dict(autorange = 'reversed'))
 
 #%% Density for at least 3 pickups
 df_piv_three = df_piv[df_piv['total_count_pickup_dates'] >= 3].nlargest(10, 'avg_litter_pickedup')
@@ -118,13 +81,31 @@ density_bar_three = px.bar(df_piv_three, x='avg_litter_pickedup',
         labels={'add_blocknum_street': 'Street Block',
                 'avg_litter_pickedup': 'Average Litter Picked Up',
                 'total_count_pickup_dates': 'Count of Outings'},
-        color = 'total_count_pickup_dates',
-        color_continuous_scale='teal')
+        color = 'add_blocknum_street',
+        color_discrete_sequence=px.colors.qualitative.G10)
 
 density_bar_three.update_layout(yaxis_title=None, xaxis_title = None,plot_bgcolor = 'lightgrey')
-density_bar_three.update_layout(yaxis = dict(autorange = 'reversed'))
+density_bar_three.update_layout(showlegend=False)
 
 
+# test plot
+density_fig = px.scatter_mapbox(df_piv_three, lat="min_lat", lon="min_lon",    
+                        color='add_blocknum_street', size="avg_litter_pickedup",
+                        color_discrete_sequence=px.colors.qualitative.G10,
+                        zoom=13,
+                        hover_data={'avg_litter_pickedup': True,
+                                    'min_lat': False,
+                                    'min_lon': False,
+                                    'add_blocknum_street': True,
+                                    'total_count_pickup_dates': True},
+                        labels = {'add_blocknum_street': 'Street Block',
+                                  'total_count_pickup_dates': 'Count of Outings',
+                                  'avg_litter_pickedup': 'Average Litter Picked Up'}
+                        )
+density_fig.update_layout(legend_title_text = 'Street Block')
+density_fig.update_layout(mapbox_accesstoken = mytoken)
+density_fig.update_layout(legend=dict(bgcolor = 'LightGrey',
+                                  bordercolor = 'Black'))
 
 # %% app instantiation
 
@@ -311,24 +292,26 @@ app.layout = html.Div([
     
     html.Br(),
     html.Br(),
-    html.H1('Litter Density by Street Block',
+    html.H1('Top 10 Litter Density by Street Block',
             style = {'textAlign': 'center'}),
     
     html.Br(),
+    html.H4('Street blocks with highest average litter with 3 or more outings',
+            style = {'textAlign': 'center'}),
     
-    dbc.Row([
-        dbc.Col([
-            html.H4('Top 20 Average Litter',
-                    style = {'width': '130vh',
-                             'textAlign': 'center'})
-        ]),
+    # dbc.Row([
+    #     dbc.Col([
+    #         html.H4('Top 20 Average Litter',
+    #                 style = {'width': '130vh',
+    #                          'textAlign': 'center'})
+    #     ]),
 
-        dbc.Col([
-            html.H4('Top 10 Average Litter for > 2 Outings',
-                    style = {'width': '60vh',
-                             'textAlign': 'center'})
-        ]),
-    ]),
+    #     dbc.Col([
+    #         html.H4('Top 10 Average Litter for > 2 Outings',
+    #                 style = {'width': '60vh',
+    #                          'textAlign': 'center'})
+    #     ]),
+    # ]),
     
 
     
@@ -336,21 +319,21 @@ app.layout = html.Div([
     dbc.Row([
         dbc.Col([
             dcc.Graph(figure=density_fig,
-              style = {'width': '70vh', 'height': '70vh'},
+              style = {'width': '90vh', 'height': '70vh'},
               config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]})
         ]),
 
-        dbc.Col([
-            dcc.Graph(figure=density_bar,
-              style = {'width': '60vh', 'height': '70vh'},
-              config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
-                                                   "autoScale2d" "select2d", "lasso2d"]})
-        ]),
+        # dbc.Col([
+        #     dcc.Graph(figure=density_bar,
+        #       style = {'width': '60vh', 'height': '70vh'},
+        #       config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
+        #                                            "autoScale2d" "select2d", "lasso2d"]})
+        # ]),
 
         dbc.Col([
             dcc.Graph(figure=density_bar_three,
-              style = {'width': '60vh', 'height': '70vh'},
+              style = {'width': '90vh', 'height': '70vh'},
               config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]})
         ]),
