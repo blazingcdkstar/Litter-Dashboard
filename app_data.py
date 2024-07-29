@@ -245,6 +245,7 @@ litter_industrial = clean_subset(litter_industrial, 'industrial')
 
 litter_dogshit = litter.iloc[:,col_names_index[10]:col_names_index[11]]
 litter_dogshit = clean_subset(litter_dogshit, 'dogshit')
+litter_dogshit['main_category'] = 'pet_waste'
 
 litter_other = litter.iloc[:,col_names_index[13]:289]
 litter_other = clean_subset(litter_other, 'other')

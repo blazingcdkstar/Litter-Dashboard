@@ -1,15 +1,20 @@
 
 
+
+
 #%% load libraries
 from dash import Dash, dcc, html, Input, Output, dash_table # pip install dash
 import dash_bootstrap_components as dbc 
 from dash.exceptions import PreventUpdate
-#import dash_ag_grid as dag # pip install dash-ag-grid
+from dash_iconify import DashIconify
+
+
 
 # import data libraries
 import pandas as pd  # pip install pandas
 import datetime as dt # pip install datetime
 import numpy as np    # pip install numpy
+import cv2
 
 # plotting packages
 import plotly.graph_objects as go #pip install plotly
@@ -37,7 +42,7 @@ def mysum(main_category):
 
 #%% Set Variables
 # mapbox token
-mytoken = 'Enter your mapbox key here.'
+mytoken = 'Enter your mapbox token here.'
 
 color_discrete_map = {'Softdrinks': '#3366CC',
                             'Food': '#DC3912',
@@ -63,7 +68,7 @@ total_coffee = mysum('Coffee')
 total_sanitary = mysum('Sanitary')
 total_custom = mysum('Custom_Litter_Type')
 total_industrial = mysum('Industrial')
-total_dogshit = mysum('Dogshit')
+total_dogshit = mysum('Pet_Waste')
 
 total_small_constributors = total_sanitary + total_custom + total_industrial + total_dogshit
 
@@ -86,6 +91,7 @@ density_bar_three = px.bar(df_piv_three, x='avg_litter_pickedup',
 
 density_bar_three.update_layout(yaxis_title=None, xaxis_title = None,plot_bgcolor = 'lightgrey')
 density_bar_three.update_layout(showlegend=False)
+density_bar_three.update_layout(font=dict(size=15))
 
 
 # test plot
@@ -104,36 +110,56 @@ density_fig = px.scatter_mapbox(df_piv_three, lat="min_lat", lon="min_lon",
                         )
 density_fig.update_layout(legend_title_text = 'Street Block')
 density_fig.update_layout(mapbox_accesstoken = mytoken)
-density_fig.update_layout(legend=dict(bgcolor = 'LightGrey',
-                                  bordercolor = 'Black'))
+# density_fig.update_layout(legend=dict(bgcolor = 'LightGrey',
+#                                   bordercolor = 'Black'))
+density_fig.update_layout(showlegend=False)
 
 # %% app instantiation
 
 app = Dash(__name__,
-                external_stylesheets=[dbc.themes.LUX])
+                external_stylesheets=[dbc.themes.COSMO])
 
 #%% app layout
 
 app.layout = html.Div([
-    html.H1('Iowa City Litter Crew',
-            style= {'color': 'darkblack',
-                    'fontSize': '40ox'}),
-    
-    html.H3('Litter and Litter Data Collected in Iowa City'),
     html.Br(),
 
-    html.H1('Total Litter Collected',
+
+
+    html.H4(dcc.Markdown("[Iowa City Litter Crew](https://www.meetup.com/iowa-city-litter-crew/)"),
+            style= {'textAlign': 'left'}),
+    
+    html.H1('Litter and Litter Data Collected in Iowa City',
+            style={'textAlign':'center'}),
+
+    html.Br(),
+
+    html.H1('Litter Collected',
             style = {'textAlign': 'center'}),
     
     html.Br(),
 
     dbc.Row([
+
+
         dbc.Col([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Total Litter Collected', className='card-title'),
-                        html.P(total_litter, className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Total Litter Collected', className='card-title'),
+                                DashIconify(icon="f7:trash",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_litter, 
+                                       className= 'card-text',
+                                       style={'textAlign': 'right',
+                                              'fontSize': 40},
+                                       )
+                            ]),
+                        ])
                         
                     ]
                 )
@@ -144,8 +170,21 @@ app.layout = html.Div([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Soft Drinks', className='card-title'),
-                        html.P(total_softdrinks, className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Soft Drinks', className='card-title'),
+                                DashIconify(icon="mdi:bottle-soda-classic-outline",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_softdrinks, 
+                                       className= 'card-text',
+                                       style={'textAlign': 'right',
+                                              'fontSize': 40},
+                                       )
+                            ]),
+                        ])
+                        
                     ]
                 )
             ])
@@ -155,33 +194,76 @@ app.layout = html.Div([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Food', className='card-title'),
-                        html.P(total_food, className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Food', className='card-title'),
+                                DashIconify(icon="pajamas:food",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_food, 
+                                       className= 'card-text',
+                                       style={'textAlign': 'right',
+                                              'fontSize': 40},
+                                       )
+                            ]),
+                        ])
+                        
                     ]
                 )
             ])
         ]),
 
+
         dbc.Col([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Other', className='card-title'),
-                        html.P(total_other, className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Other', className='card-title'),
+                                DashIconify(icon="material-symbols:shopping-bag-outline",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_other, 
+                                        className= 'card-text',
+                                        style={'textAlign': 'right',
+                                                'fontSize': 40},
+                                        )
+                            ]),
+                        ])
+                        
                     ]
                 )
             ])
-        ])
+        ]),
+
+
     ]),
 
 
     dbc.Row([
+
         dbc.Col([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Smoking', className='card-title'),
-                        html.P(str(total_smoking), className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Smoking', className='card-title'),
+                                DashIconify(icon="mdi:smoking",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_smoking, 
+                                        className= 'card-text',
+                                        style={'textAlign': 'right',
+                                                'fontSize': 40},
+                                        )
+                            ]),
+                        ])
+                        
                     ]
                 )
             ])
@@ -191,57 +273,106 @@ app.layout = html.Div([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Alcohol', className='card-title'),
-                        html.P(total_alcohol, className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Alcohol', className='card-title'),
+                                DashIconify(icon="streamline:champagne-party-alcohol",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_alcohol, 
+                                        className= 'card-text',
+                                        style={'textAlign': 'right',
+                                                'fontSize': 40},
+                                        )
+                            ]),
+                        ])
+                        
                     ]
                 )
             ])
         ]),
 
+        
         dbc.Col([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Coffee', className='card-title'),
-                        html.P(total_coffee, className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Coffee', className='card-title'),
+                                DashIconify(icon="ep:coffee",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_coffee, 
+                                        className= 'card-text',
+                                        style={'textAlign': 'right',
+                                                'fontSize': 40},
+                                        )
+                            ]),
+                        ])
+                        
                     ]
                 )
             ])
         ]),
 
+
+
+
+     
+
         dbc.Col([
             dbc.Card([
                 dbc.CardBody(
                     [
-                        html.H4('Sanitary, Industrial, and Custom', className='card-title'),
-                        html.P(total_small_constributors, className= 'card-text')
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4('Sanitary, Industrial, and Custom', className='card-title'),
+                                DashIconify(icon="f7:facemask",
+                                    width=30)
+                            ]),
+                            dbc.Col([
+                                html.P(total_small_constributors, 
+                                        className= 'card-text',
+                                        style={'textAlign': 'right',
+                                                'fontSize': 40},
+                                        )
+                            ]),
+                        ])
+                        
                     ]
                 )
             ])
-        ])
+        ]),
+
     ]),
 
     html.Br(),
     html.Br(),
 
-    html.H1('Litter Location and Composition',
+    html.H1('Litter Location, Composition and Timeline',
             style = {'textAlign': 'center'}), 
     html.Br(),
 
-    html.H6('Select litter type from the drop down for graphics to appear.'),
+    html.H5('Select or remove item(s) from the drop down.'),
     dcc.Dropdown(
         id = 'litter_type_dd',
         placeholder = 'Select a litter type...',
         multi=True,
-        #value = 'alcohol',
+        value = ['Coffee', 'Food'],
         clearable = True,
         searchable = True,
         options = [{'label': main_category,
                    'value': main_category}
-                   for main_category in sorted(df['main_category'].unique())], style={'width': '50%'}),
-    
-    
-  
+                   for main_category in sorted(df['main_category'].unique())], style={'width': '70%',
+                                                                                      'height': '100%',
+                                                                                      'font-size': 25}),
+
+    html.Br(),
+
+    html.H5('Select the date range.'),    
 
     dcc.DatePickerRange(
         id = 'date_range',
@@ -252,34 +383,52 @@ app.layout = html.Div([
         end_date = df['date_taken_date'].max()
         
     ), 
+
+    html.Br(),
+    html.Br(),
+
+    # dash_table.DataTable(
+                
+    #             id = 'mytable',
+    #             fill_width=False,
+    #             style_cell={'font_size': '20',
+    #                         'text_align': 'center'}),
     
     dbc.Row([
-        dbc.Col([
-            dcc.Graph(id = 'litter_density_map',
-            config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
-                                                   "autoScale2d" "select2d", "lasso2d"]})
-
-        ]),
-
-       
 
         dbc.Col([
 
             dash_table.DataTable(
                 
-                id = 'mytable'
-                    
-                )
+                id = 'mytable',
+                fill_width=False,
+                style_cell={'fontSize': 20,
+                            'text_align': 'center',
+                            'padding': '5px'},
+                style_header={'fontWeight': 'bold'},
+                style_table={'paddingLeft':'50px',
+                             'paddingTop': '50px'})
                 
-    
+    ,
                 ]),
         
-        dbc.Col([dcc.Graph(id = 'sunburst_chart')
+
+        dbc.Col([dcc.Graph(id = 'sunburst_chart',
+                           style = {'height': '40vh',
+                                    'width' : '30vw',
+                                    'paddingLeft':'0px',
+                                    'paddingTop':'0px'})
         
-        ])   
+        ]) ,
 
+        dbc.Col([
+            dcc.Graph(id = 'litter_density_map',
+                      style = {'height': '50vh',
+                               'width': '50vw'},
+            config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
+                                                   "autoScale2d" "select2d", "lasso2d"]})
 
-
+        ]),
 
 
 
@@ -287,6 +436,7 @@ app.layout = html.Div([
 
     
     dcc.Graph(id = 'bar_chart',
+            style = {'height': '50vh'},
             config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]}),
     
@@ -296,22 +446,10 @@ app.layout = html.Div([
             style = {'textAlign': 'center'}),
     
     html.Br(),
-    html.H4('Street blocks with highest average litter with 3 or more outings',
+    html.H3('Street blocks with highest average litter with at least 3 unique event dates.',
             style = {'textAlign': 'center'}),
     
-    # dbc.Row([
-    #     dbc.Col([
-    #         html.H4('Top 20 Average Litter',
-    #                 style = {'width': '130vh',
-    #                          'textAlign': 'center'})
-    #     ]),
-
-    #     dbc.Col([
-    #         html.H4('Top 10 Average Litter for > 2 Outings',
-    #                 style = {'width': '60vh',
-    #                          'textAlign': 'center'})
-    #     ]),
-    # ]),
+   
     
 
     
@@ -319,21 +457,14 @@ app.layout = html.Div([
     dbc.Row([
         dbc.Col([
             dcc.Graph(figure=density_fig,
-              style = {'width': '90vh', 'height': '70vh'},
+              style = {'width': '40vw', 'height': '50vh'},
               config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]})
         ]),
 
-        # dbc.Col([
-        #     dcc.Graph(figure=density_bar,
-        #       style = {'width': '60vh', 'height': '70vh'},
-        #       config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
-        #                                            "autoScale2d" "select2d", "lasso2d"]})
-        # ]),
-
         dbc.Col([
             dcc.Graph(figure=density_bar_three,
-              style = {'width': '90vh', 'height': '70vh'},
+              style = {'width': '40vw', 'height': '50vh'},
               config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]})
         ]),
@@ -369,9 +500,9 @@ def density_map(mycategory, start_date, end_date):
     
     
     fig = px.scatter_mapbox(temp_df, lat="lat", lon="lon",    
-                            color="main_category", size="litter_count",
-                            height = 600, width = 1000, 
-                            size_max=15, zoom=13,
+                            color="main_category", 
+                            size="litter_count",
+                            zoom=13,
                             color_discrete_map=color_discrete_map,
                             hover_data={'litter_count': True,
                                     'lat': False,
@@ -381,8 +512,14 @@ def density_map(mycategory, start_date, end_date):
                                       'main_category': 'Litter Type'})
     
     fig.update_layout(legend=dict(bgcolor = 'LightGrey',
-                                  bordercolor = 'Black'))
-    fig.update_layout(legend_title_text = 'Litter Type')
+                                  bordercolor = 'Black',
+                                  orientation = 'v',
+                                  yanchor='top',
+                                  x=0.01)),
+    
+    fig.update_layout(legend_title = 'Litter Type',
+                      font=dict(size = 15))
+    
     fig.update_layout(mapbox_accesstoken = mytoken)
     return fig
 
@@ -424,7 +561,8 @@ def sunburst_chart(mycategory, start_date, end_date):
     #fig.update_traces(hovertemplate = "Main Category: %{parent}: <br>Sub Category: %{label} </br>Count:%{value} </br>Percentage:%{percentParent:.02f}")
     fig.update_traces(hovertemplate = "Main Category: %{parent}: <br>Sub Category: %{label} </br>Count:%{value}")
     fig.update_layout(margin = dict(t=0, l=0, r=0, b=0))
-    fig.layout.coloraxis.colorbar['thickness'] = 200
+    #fig.layout.coloraxis.colorbar['thickness'] = 200
+    fig.update_layout(font=dict(size=15))
     return fig
 
 #%%
@@ -455,6 +593,9 @@ def get_my_table(mycategory, start_date, end_date):
 
     mytable = (pd.DataFrame([*mytable.values, ['Total', *mytable.sum(numeric_only=True).values]], 
               columns=mytable.columns))
+    
+    mytable = mytable.rename(columns={'main_category': 'Main Category',
+                                      'litter_count': 'Litter Count'})
     
     
 
@@ -500,6 +641,7 @@ def my_bar_chart(mycategory, start_date, end_date):
     
     fig.update_layout(showlegend = False)
     fig.update_layout(plot_bgcolor = 'lightgrey')
+    fig.update_layout(font=dict(size=15))
     return fig
 
 
@@ -509,4 +651,4 @@ def my_bar_chart(mycategory, start_date, end_date):
 
 #%% Run App
 if __name__ == '__main__':
-    app.run_server(debug=True, port= 5678)
+    app.run_server()
