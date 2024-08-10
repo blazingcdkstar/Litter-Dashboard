@@ -1,7 +1,5 @@
 
 
-
-
 #%% load libraries
 from dash import Dash, dcc, html, Input, Output, dash_table # pip install dash
 import dash_bootstrap_components as dbc 
@@ -14,15 +12,20 @@ from dash_iconify import DashIconify
 import pandas as pd  # pip install pandas
 import datetime as dt # pip install datetime
 import numpy as np    # pip install numpy
-import cv2
+
 
 # plotting packages
 import plotly.graph_objects as go #pip install plotly
 import plotly.express as px
-import folium  # pip install folium
+
 
 # load data wrangling module
 import app_data as ad
+
+# for heroku app
+import pathlib
+PATH=pathlib.Path(__file__).parent
+DATA_PATH = PATH.joinpath('data').resolve()
 
 
 #%% load data
@@ -42,7 +45,7 @@ def mysum(main_category):
 
 #%% Set Variables
 # mapbox token
-mytoken = 'Enter your mapbox token here.'
+mytoken = 'Enter your Mapbox token here.'
 
 color_discrete_map = {'Softdrinks': '#3366CC',
                             'Food': '#DC3912',
@@ -86,18 +89,21 @@ density_bar_three = px.bar(df_piv_three, x='avg_litter_pickedup',
         labels={'add_blocknum_street': 'Street Block',
                 'avg_litter_pickedup': 'Average Litter Picked Up',
                 'total_count_pickup_dates': 'Count of Outings'},
-        color = 'add_blocknum_street',
-        color_discrete_sequence=px.colors.qualitative.G10)
+        color = 'avg_litter_pickedup',
+        color_continuous_scale=['steelblue', 'darkorange'])
 
-density_bar_three.update_layout(yaxis_title=None, xaxis_title = None,plot_bgcolor = 'lightgrey')
-density_bar_three.update_layout(showlegend=False)
+density_bar_three.update_layout(yaxis_title=None, xaxis_title = 'Average Litter Picked Up', plot_bgcolor = 'lightgrey')
 density_bar_three.update_layout(font=dict(size=15))
+density_bar_three.update_layout(yaxis=dict(autorange = 'reversed'))
 
 
-# test plot
+# Density Map
 density_fig = px.scatter_mapbox(df_piv_three, lat="min_lat", lon="min_lon",    
-                        color='add_blocknum_street', size="avg_litter_pickedup",
-                        color_discrete_sequence=px.colors.qualitative.G10,
+                        color='avg_litter_pickedup', 
+                        size="avg_litter_pickedup",
+                        #size = df_piv_three['avg_litter_pickedup'] * 2,
+                        color_continuous_scale=['steelblue', 'darkorange'],
+                        #color_continuous_midpoint=10,
                         zoom=13,
                         hover_data={'avg_litter_pickedup': True,
                                     'min_lat': False,
@@ -108,16 +114,20 @@ density_fig = px.scatter_mapbox(df_piv_three, lat="min_lat", lon="min_lon",
                                   'total_count_pickup_dates': 'Count of Outings',
                                   'avg_litter_pickedup': 'Average Litter Picked Up'}
                         )
-density_fig.update_layout(legend_title_text = 'Street Block')
+
+density_fig.update_layout(font=dict(size=15))
 density_fig.update_layout(mapbox_accesstoken = mytoken)
-# density_fig.update_layout(legend=dict(bgcolor = 'LightGrey',
-#                                   bordercolor = 'Black'))
-density_fig.update_layout(showlegend=False)
+
 
 # %% app instantiation
 
 app = Dash(__name__,
-                external_stylesheets=[dbc.themes.COSMO])
+           external_stylesheets=[dbc.themes.COSMO],
+           meta_tags=[{'name': 'viewport',
+                      'content': 'width=device-width, initial-scale=1.0, maximum-scale=1.2, minimum-scale=0.5,'}]
+                )
+# for heroku app
+server = app.server
 
 #%% app layout
 
@@ -158,12 +168,12 @@ app.layout = html.Div([
                                        style={'textAlign': 'right',
                                               'fontSize': 40},
                                        )
-                            ]),
+                            ]), 
                         ])
                         
                     ]
                 )
-            ])
+        ],color = 'lightgrey', inverse = False)
         ]),
 
         dbc.Col([
@@ -187,7 +197,7 @@ app.layout = html.Div([
                         
                     ]
                 )
-            ])
+            ],color = 'lightgrey', inverse = False)
         ]),
 
         dbc.Col([
@@ -211,7 +221,7 @@ app.layout = html.Div([
                         
                     ]
                 )
-            ])
+            ],color = 'lightgrey', inverse = False)
         ]),
 
 
@@ -236,7 +246,7 @@ app.layout = html.Div([
                         
                     ]
                 )
-            ])
+            ],color = 'lightgrey', inverse = False)
         ]),
 
 
@@ -266,7 +276,7 @@ app.layout = html.Div([
                         
                     ]
                 )
-            ])
+            ],color = 'lightgrey', inverse = False)
         ]),
 
         dbc.Col([
@@ -290,7 +300,7 @@ app.layout = html.Div([
                         
                     ]
                 )
-            ])
+            ],color = 'lightgrey', inverse = False)
         ]),
 
         
@@ -315,7 +325,7 @@ app.layout = html.Div([
                         
                     ]
                 )
-            ])
+            ],color = 'lightgrey', inverse = False)
         ]),
 
 
@@ -344,7 +354,7 @@ app.layout = html.Div([
                         
                     ]
                 )
-            ])
+            ],color = 'lightgrey', inverse = False)
         ]),
 
     ]),
@@ -352,11 +362,38 @@ app.layout = html.Div([
     html.Br(),
     html.Br(),
 
-    html.H1('Litter Location, Composition and Timeline',
+    html.Br(),
+    html.Br(),
+    html.H1('Top 10 Litter Density by Street Block',
+            style = {'textAlign': 'center'}),
+    
+    html.Br(),
+    html.H3('Street blocks with highest average litter with at least 3 unique event dates.',
+            style = {'textAlign': 'center'}),
+
+     dbc.Row([
+        dbc.Col([
+            dcc.Graph(figure=density_fig,
+              style = {'width': '40vw', 'height': '50vh'},
+              config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
+                                                   "autoScale2d" "select2d", "lasso2d"]})
+        ], xs=8, sm=8, md=12, lg=6, xl=5),
+
+        dbc.Col([
+            dcc.Graph(figure=density_bar_three,
+              style = {'width': '40vw', 'height': '50vh'},
+              config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
+                                                   "autoScale2d" "select2d", "lasso2d"]})
+        ], xs=8, sm=8, md=12, lg=6, xl=5),
+
+    
+    ]),
+
+    html.H1('Litter Location, Composition and Timeline Based on Selections',
             style = {'textAlign': 'center'}), 
     html.Br(),
 
-    html.H5('Select or remove item(s) from the drop down.'),
+    html.H5('Add or remove item(s) from the drop down.'),
     dcc.Dropdown(
         id = 'litter_type_dd',
         placeholder = 'Select a litter type...',
@@ -387,16 +424,13 @@ app.layout = html.Div([
     html.Br(),
     html.Br(),
 
-    # dash_table.DataTable(
-                
-    #             id = 'mytable',
-    #             fill_width=False,
-    #             style_cell={'font_size': '20',
-    #                         'text_align': 'center'}),
     
     dbc.Row([
 
         dbc.Col([
+            html.H4('Litter Quantity',
+                    style = {'textAlign': 'center',
+                             'paddingRight':'125px'}),
 
             dash_table.DataTable(
                 
@@ -407,14 +441,19 @@ app.layout = html.Div([
                             'padding': '5px'},
                 style_header={'fontWeight': 'bold'},
                 style_table={'paddingLeft':'50px',
-                             'paddingTop': '50px'})
+                             'paddingTop': '10px'})
                 
     ,
                 ]),
         
 
-        dbc.Col([dcc.Graph(id = 'sunburst_chart',
-                           style = {'height': '40vh',
+        dbc.Col([
+            html.H4('Litter Composition',
+                    style = {'textAlign':'center'}),
+
+
+            dcc.Graph(id = 'sunburst_chart',
+                           style = {'height': '30vh',
                                     'width' : '30vw',
                                     'paddingLeft':'0px',
                                     'paddingTop':'0px'})
@@ -422,8 +461,12 @@ app.layout = html.Div([
         ]) ,
 
         dbc.Col([
+
+            html.H4('Litter Location',
+                    style = {'textAlign':'center'}),
+
             dcc.Graph(id = 'litter_density_map',
-                      style = {'height': '50vh',
+                      style = {'height': '40vh',
                                'width': '50vw'},
             config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
                                                    "autoScale2d" "select2d", "lasso2d"]})
@@ -434,46 +477,13 @@ app.layout = html.Div([
 
     ]),  
 
+    html.H4('Litter Timeline',
+                    style = {'textAlign':'center'}),
     
     dcc.Graph(id = 'bar_chart',
-            style = {'height': '50vh'},
+            style = {'height': '35vh'},
             config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
-                                                   "autoScale2d" "select2d", "lasso2d"]}),
-    
-    html.Br(),
-    html.Br(),
-    html.H1('Top 10 Litter Density by Street Block',
-            style = {'textAlign': 'center'}),
-    
-    html.Br(),
-    html.H3('Street blocks with highest average litter with at least 3 unique event dates.',
-            style = {'textAlign': 'center'}),
-    
-   
-    
-
-    
-
-    dbc.Row([
-        dbc.Col([
-            dcc.Graph(figure=density_fig,
-              style = {'width': '40vw', 'height': '50vh'},
-              config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
-                                                   "autoScale2d" "select2d", "lasso2d"]})
-        ]),
-
-        dbc.Col([
-            dcc.Graph(figure=density_bar_three,
-              style = {'width': '40vw', 'height': '50vh'},
-              config = {'modeBarButtonsToRemove': ['select','zoom', "pan2d", "autoScale",
-                                                   "autoScale2d" "select2d", "lasso2d"]})
-        ]),
-
-    
-    ]),
-    
-
-      
+                                                   "autoScale2d" "select2d", "lasso2d"]}),   
     
    
 ])
@@ -558,11 +568,10 @@ def sunburst_chart(mycategory, start_date, end_date):
     
     
     fig.update_traces(textinfo="label+percent parent")
-    #fig.update_traces(hovertemplate = "Main Category: %{parent}: <br>Sub Category: %{label} </br>Count:%{value} </br>Percentage:%{percentParent:.02f}")
     fig.update_traces(hovertemplate = "Main Category: %{parent}: <br>Sub Category: %{label} </br>Count:%{value}")
     fig.update_layout(margin = dict(t=0, l=0, r=0, b=0))
-    #fig.layout.coloraxis.colorbar['thickness'] = 200
     fig.update_layout(font=dict(size=15))
+    
     return fig
 
 #%%
@@ -641,6 +650,7 @@ def my_bar_chart(mycategory, start_date, end_date):
     
     fig.update_layout(showlegend = False)
     fig.update_layout(plot_bgcolor = 'lightgrey')
+    #fig.layout.paper_bgcolor = 'lightgrey'
     fig.update_layout(font=dict(size=15))
     return fig
 
