@@ -531,7 +531,7 @@ conditions = [
 
 results = ['pm', 'am']
 
-durations['am_pm'] = np.select(conditions, results)
+durations['am_pm'] = np.select(conditions, results, default=pd.NaT)
 
 durations['pick_up_event'] = durations['date_taken_date'].astype(str) + '_' + durations['am_pm']
 
