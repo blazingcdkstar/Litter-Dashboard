@@ -50,12 +50,19 @@ ID 459532 is custom tagged as a hair net, and has no value in the total column i
 
 # Data packages
 import pandas as pd
+pd.options.mode.chained_assignment = None
+
 import numpy as np
 import gc
 
-# graphing packages
-import plotly.express as px
-import matplotlib.pyplot as plt
+# durations
+from datetime import datetime
+
+
+# herokuapp
+import pathlib
+PATH=pathlib.Path(__file__).parent
+DATA_PATH = PATH.joinpath('data').resolve()
 
 # create list of main base columns in dataset
 base_columns = ['id', 'verification','phone', 'date_taken', 'date_taken_date', 'date_taken_yrmth',
@@ -67,8 +74,9 @@ base_columns = ['id', 'verification','phone', 'date_taken', 'date_taken_date', '
 ######################################################                         #################################################################
 
 #%% Import Data
-litter = pd.read_csv('Data\OpenLitterMap.csv')
-
+#litter = pd.read_csv('Data\OpenLitterMap.csv')
+# herokuapp
+litter = pd.read_csv(DATA_PATH.joinpath('OpenLitterMap.csv'))
 
 #%% make dates date data type
 litter['date_taken'] = pd.to_datetime(litter['date_taken'])
@@ -123,7 +131,10 @@ litter['address'] = litter['address'].str.replace("Wells Fargo, ", '103, ')
 
 # remove neighborhoods and placenames
 # create list of placenames to remove
-str_orig = ['Plum Grove Acres, ','Kirkwood Place, ','Sunnyside, ', 'AMC DINE-IN Coral Ridge 10, ', 'Continuing Education Center, ', 'Formosa Sushi Bar, ', 'Plaza Centre One, ', 'Procter & Gamble Oral Care, ', "Sueppel's Flowers, ", 'Taco Loco, ', 'US-IA, ', 'Nodo Coffee, Carry-Out & Catering, ']
+str_orig = ['Plum Grove Acres, ','Kirkwood Place, ','Sunnyside, ', 'AMC DINE-IN Coral Ridge 10, ',
+            'Continuing Education Center, ', 'Formosa Sushi Bar, ', 'Plaza Centre One, ',
+            'Procter & Gamble Oral Care, ', "Sueppel's Flowers, ", 'Taco Loco, ', 'US-IA, ',
+            'Nodo Coffee, Carry-Out & Catering, ', 'Borland Place, ']
 
 # replace with empty string
 input_char = ''
@@ -250,6 +261,17 @@ litter_dogshit['main_category'] = 'pet_waste'
 litter_other = litter.iloc[:,col_names_index[13]:289]
 litter_other = clean_subset(litter_other, 'other')
 
+litter_other['sub_category'] = (litter_other['sub_category']
+                                .str.replace('plastic.1', 'unknown_plastic', regex=False))
+
+litter_other['sub_category'] = (litter_other['sub_category']
+                                .str.replace('paper.1', 'unknown_paper', regex=False))
+
+litter_other['sub_category'] = (litter_other['sub_category']
+                                .str.replace('metal.1', 'unknown_metal', regex=False))
+
+litter_other['sub_category'] = (litter_other['sub_category']
+                                .str.replace('balloons.1', 'balloons', regex=False))
 
 #%% Combine data subsets into one data frame
 litter_categories = pd.concat([litter_smoking, litter_food, litter_coffee, litter_alcohol,
@@ -363,6 +385,9 @@ add_num['add_block_num'] = round(add_num['add_is_num']/100,0)*100
 add_num['add_block_num'] = add_num['add_block_num'].fillna(add_num['add_is_text']) 
 # remove .0 from the number
 add_num['add_block_num'] = add_num['add_block_num'].astype(str).apply(lambda x: x.replace('.0',''))
+# if the address number = 0, change to 10
+add_num['add_block_num'] = add_num['add_block_num'].replace('0','10')
+
 
 
 # %%
@@ -403,9 +428,149 @@ litter_sum['avg_litter_pickedup'] = round((litter_sum['total_litter_pickedup']) 
 litter_sum = pd.merge(litter_sum, df_latlon, on = 'add_blocknum_street', how = 'left')
 
 
-#%% clean up environment
-
-del actual_vals, add_num, base_columns, col_names, col_names_all, col_names_index, df_latlon,expected_vals, i, input_char, litter_add_5, litter_add_6, litter_add_final, litter_base, litter_categories, st_count, str_orig, test_comma_counts, test_list, test_list_sum, val
 
 litter=litter.rename(columns = {'value': 'litter_count'})
+
+
+#%%
+###################################################### < Step 6: Get Litter Pickup Durations       > ####################################################
+###################################################### < Replace times when litter was picked      > ####################################################
+###################################################### < up at different times through the day     > ####################################################
+###################################################### < group data by date, am_pm                 > ####################################################
+###################################################### < get min time, max time, duration, and litter count   > ####################################################
+
+#%%
+
+# replace values
+# litter can be picked up several times throughout the day.
+# I am going to replace time stamps so that duration is not impacted by this scenario
+
+
+def update_time(myid, mydate):
+    myindex = durations.index[durations['id'] == myid].tolist()
+    durations.loc[myindex, 'date_taken'] = mydate
+
+durations = litter[['id', 'date_taken_date', 'date_taken', 'litter_count']]
+# June 23, 2024
+
+update_time(myid = 505104, mydate = '2024-06-23 15:02:00')
+update_time(myid = 505105, mydate = '2024-06-23 15:04:00')
+update_time(myid = 505158, mydate = '2024-06-23 15:07:00')
+update_time(myid = 505159, mydate = '2024-06-23 15:09:00')
+update_time(myid = 505165, mydate = '2024-06-23 15:10:00')
+
+# November 25, 2023
+update_time(myid = 491521, mydate = '2023-11-25 22:10:00')
+
+# September 2, 2023
+update_time(myid = 456907, mydate = '2023-09-02 19:15:00')
+update_time(myid = 456908, mydate = '2023-09-02 19:16:00')
+update_time(myid = 456909, mydate = '2023-09-02 19:17:00')
+update_time(myid = 456910, mydate = '2023-09-02 19:18:00')
+
+# September 16, 2023
+update_time(myid = 463253, mydate = '2023-09-16 21:06:00')
+update_time(myid = 463254, mydate = '2023-09-16 21:07:00')
+update_time(myid = 463255, mydate = '2023-09-16 21:08:00')
+
+# September 20, 2023
+update_time(myid = 470493, mydate = '2023-09-20 13:50:00')
+update_time(myid = 470289, mydate = '2023-09-20 13:52:00')
+
+# September 23, 2023
+update_time(myid = 471118, mydate = '2023-09-23 18:50:00')
+
+# September 30, 2023
+update_time(myid = 472973, mydate = '2023-09-30 21:22:00')
+
+# October 19, 2023
+update_time(myid = 483208, mydate = '2023-10-19 03:30:00')
+update_time(myid = 483409, mydate = '2023-10-19 03:32:00')
+update_time(myid = 483410, mydate = '2023-10-19 03:34:00')
+update_time(myid = 483411, mydate = '2023-10-19 03:36:00')
+update_time(myid = 483412, mydate = '2023-10-19 03:38:00')
+
+# November 4, 2023
+update_time(myid = 486039, mydate = '2023-11-04 18:15:00')
+update_time(myid = 486040, mydate = '2023-11-04 18:17:00')
+
+# November 10, 2023
+update_time(myid = 486630, mydate = '2023-11-10 23:30:00')
+
+# November 12, 2023
+update_time(myid = 488682, mydate = '2023-11-12 16:42:00')
+update_time(myid = 488683, mydate = '2023-11-12 16:44:00')
+
+# November 18, 2023
+update_time(myid = 489878, mydate = '2023-11-18 22:08:00')
+update_time(myid = 489879, mydate = '2023-11-18 22:10:00')
+update_time(myid = 489880, mydate = '2023-11-18 22:12:00')
+update_time(myid = 489881, mydate = '2023-11-18 22:14:00')
+
+# February 11, 2024
+update_time(myid = 496952, mydate = '2024-02-11 20:40:00')
+
+# August 14th, 2024
+update_time(myid = 512591, mydate = '2024-08-14 13:56:00')
+update_time(myid = 512592, mydate = '2024-08-14 13:58:00')
+
+# August 20th, 2024
+update_time(myid = 513314, mydate = '2024-08-20 20:40:00')
+
+
+#%% split out litter pickups throughout the day by am/pm
+# the time stamp is on gmt time, so when I walk Lulu is PM (AM CST) and when I walk Kipper is AM (PM CST).
+# This does a good job of splitting out the 2 litter pickup events.
+# But when it does not the time stamp is hard coded with previous code section.
+# This prevents 2 litter events taking 1 hour to pick up do not show as 8 hours duration.
+
+conditions = [
+    (durations['date_taken'].dt.hour >= 12),
+    (durations['date_taken'].dt.hour < 12)
+]
+
+results = ['pm', 'am']
+
+durations['am_pm'] = np.select(conditions, results)
+
+durations['pick_up_event'] = durations['date_taken_date'].astype(str) + '_' + durations['am_pm']
+
+
+#%% Aggregation
+# get the earliest time stamp, the latest time stamp, and the sum of the litter count for each litter pick up event.
+
+durations_piv = durations.groupby(['pick_up_event']).agg(min_date = ('date_taken', np.min),
+                                                 max_date = ('date_taken', np.max),
+                                                 sum_litter = ('litter_count', np.sum)).reset_index()
+
+
+
+#%% get durations
+
+fmt = '%Y-%m-%d %H:%M:%S'
+durations_piv['max_date_fmt'] = (durations_piv['max_date']
+                                 .dt.strftime(fmt))
+
+durations_piv['min_date_fmt'] = (durations_piv['min_date']
+                                 .dt.strftime(fmt))
+
+durations_piv['date_diff'] = durations_piv['max_date'] - durations_piv['min_date']
+
+durations_piv['duration_mins'] = (durations_piv['date_diff'].dt.seconds)/60
+
+durations_piv['litter_per_min']= durations_piv['sum_litter']/(durations_piv['duration_mins']+1)
+
+avg_duration = round(durations_piv['duration_mins'].mean(),0).astype(int)
+
+avg_litter_per_min = round(durations_piv['litter_per_min'].mean(),0).astype(int)
+
+
+#%% clean up environment
+
+del actual_vals, add_num, base_columns, col_names, col_names_all, col_names_index, conditions
+del df_latlon, durations, expected_vals, fmt, i, input_char, litter_add_5, litter_add_6, litter_add_final 
+del litter_base, litter_categories, results, st_count, str_orig
+del test_comma_counts, test_list, test_list_sum, val
+
+
 # %%
