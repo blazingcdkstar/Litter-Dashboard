@@ -54,6 +54,9 @@ pd.options.mode.chained_assignment = None
 
 import numpy as np
 import gc
+import re
+
+import plotly.express as px
 
 # durations
 from datetime import datetime
@@ -74,9 +77,15 @@ base_columns = ['id', 'verification','phone', 'date_taken', 'date_taken_date', '
 ######################################################                         #################################################################
 
 #%% Import Data
-#litter = pd.read_csv('Data\OpenLitterMap.csv')
+litter = pd.read_csv('Data\\OpenLitterMap.csv')
+
+litter_event = pd.read_csv('Data\\Cleanup_Events.csv')
+
 # herokuapp
-litter = pd.read_csv(DATA_PATH.joinpath('OpenLitterMap.csv'))
+#litter = pd.read_csv(DATA_PATH.joinpath('OpenLitterMap.csv'))
+
+# herokuapp - load meetup event data
+#litter_events = pd.read_csv(DATA_PATH.joinpath('Cleanup_Events.csv'))
 
 #%% make dates date data type
 litter['date_taken'] = pd.to_datetime(litter['date_taken'])
@@ -85,63 +94,7 @@ litter['date_uploaded'] = pd.to_datetime(litter['date_uploaded'])
 litter['date_taken_date'] = litter['date_taken'].dt.floor('d')
 litter['date_taken_yrmth'] = litter['date_taken_date'].apply(lambda x: x.strftime('%Y-%m'))
 
-#%% clean up addresses
-
-"""
-The address field is not consistent. For example, some addresses have a street address, some have a place name, some have a neighborhood designation along with the address. The next few steps go through and 
-replace the placenames with street addresses, and remove additional data points like the neighborhood name that are not relevant for this analysis and are not consistently part of the data.
-
-The process then counts the number of commas in the address field. If there are 6 commas, then there is a address number, street, city, country, state, zip, and country included in the address. If there are 5 columns then the 
-address number is missing. These are handled separately, and then for those that are missing the address number, the field is added with empty values and the 2 data sets are merged back together.
-
-The addresses will be grouped by block to show litter density by block.
-
-"""
-
-# make copy of address column, then replace the place names with street address as shown below.
-litter['addressx'] = litter['address']
-
-# replace placenames with street addresss
-litter['address'] = litter['address'].str.replace('L&M Mighty Shop, South Van Buren Street, ', '504, E Burlington Street, ')
-litter['address'] = litter['address'].str.replace('La Petite Academy, ', '1504, ')
-litter['address'] = litter['address'].str.replace('Elizabeth Tate Alternative High School, ', '1528, ')
-litter['address'] = litter['address'].str.replace('Four Seasons Car Wash, ', '1455, ')
-litter['address'] = litter['address'].str.replace('Periodontal Associates, ', '1517, ')
-litter['address'] = litter['address'].str.replace('Mergen Orthodontics, ', '1570, ')
-litter['address'] = litter['address'].str.replace('Lower Muscatine @ Mall Dr, ', '1800, ')
-litter['address'] = litter['address'].str.replace('Lower Muscatine Ave @ Iowa City Maketplace, ', '1600, ')
-litter['address'] = litter['address'].str.replace('Kirkwood Community College - Iowa City Campus, ', '1816, ')
-litter['address'] = litter['address'].str.replace('Sports Column, ', '12 S, ')
-litter['address'] = litter['address'].str.replace('Assembly of God Church, ', '800, ')
-litter['address'] = litter['address'].str.replace('Deli Mart, ', '1700, ')
-litter['address'] = litter['address'].str.replace('First Christian Church, ', '200, ')
-litter['address'] = litter['address'].str.replace('Iowa City Public Library, ', '123, ')
-litter['address'] = litter['address'].str.replace("Jimmy Jack's Rib Shack, ", '1940, ')
-litter['address'] = litter['address'].str.replace("JOANN Fabrics and Crafts, ", '1676, ')
-litter['address'] = litter['address'].str.replace("McDonald's, ", '1861, ')
-litter['address'] = litter['address'].str.replace("Bradley's Cleaners, ", '19030, ')
-litter['address'] = litter['address'].str.replace("Oyama Sushi, ", '1853, ')
-litter['address'] = litter['address'].str.replace("Select Physical Therapy, ", '1555, ')
-litter['address'] = litter['address'].str.replace("Southeast Junior High School, ", '2501, ')
-litter['address'] = litter['address'].str.replace("Spenler Tire, ", '1455, ')
-litter['address'] = litter['address'].str.replace("Sycamore Mall, ", '1660, ')
-litter['address'] = litter['address'].str.replace("The Record Collector, ", '116, ')
-litter['address'] = litter['address'].str.replace("Wells Fargo, ", '103, ')
-
-
-# remove neighborhoods and placenames
-# create list of placenames to remove
-str_orig = ['Plum Grove Acres, ','Kirkwood Place, ','Sunnyside, ', 'AMC DINE-IN Coral Ridge 10, ',
-            'Continuing Education Center, ', 'Formosa Sushi Bar, ', 'Plaza Centre One, ',
-            'Procter & Gamble Oral Care, ', "Sueppel's Flowers, ", 'Taco Loco, ', 'US-IA, ',
-            'Nodo Coffee, Carry-Out & Catering, ', 'Borland Place, ']
-
-# replace with empty string
-input_char = ''
-
-# loop through placenames and replace them with the empty string
-for i in range(len(str_orig)):
-    litter['address'] = litter['address'].str.replace(str_orig[i],input_char)
+litter_event['Date'] = pd.to_datetime(litter_event['Date'])
 
 
 #%%
@@ -160,9 +113,9 @@ litter_base = litter[[c for c in litter.columns if c in base_columns]]
 
 #%% Organize the data for custom tags
 
-
+litter_orig = litter
 litter_customtag = litter[['id', 'custom_tag_1']].dropna()
-litter_customtag = litter_customtag.loc[litter_customtag['custom_tag_1'] != 'category:fastfood']
+
 litter_customtag['main_category'] = 'custom_litter_type'
 litter_customtag['value'] = 1.0
 
@@ -172,9 +125,62 @@ litter_customtag = litter_customtag[['id', 'main_category', 'sub_category', 'val
 
 litter_customtag['sub_category'] = litter_customtag['sub_category'].str.lower()
 
+litter_customtag['sub_cat_2'] = ''
+litter_customtag['sub_cat_3'] = ''
+litter_customtag = litter_customtag.reset_index() 
+
+for i in range(len(litter_customtag['id'])):
+     litter_customtag.loc[i,'sub_cat_2'] = litter_customtag.loc[i, 'sub_category'].split(':')[0]
+     litter_customtag.loc[i,'sub_cat_3'] = litter_customtag.loc[i, 'sub_category'].split(':')[1]
+
+
+litter_customtag['sub_cat_2'] = litter_customtag['sub_cat_2'].str.replace('bn', 'brand_name')
+litter_customtag['sub_cat_2'] = litter_customtag['sub_cat_2'].str.replace('ot', 'other')
+
+litter_ct_brands = litter_customtag.loc[litter_customtag['sub_cat_2'] == 'brand_name']
+litter_ct_brands = litter_ct_brands[['id', 'sub_cat_2', 'sub_cat_3', 'value']]
+litter_ct_brands = litter_ct_brands.rename(columns = {'sub_cat_2': 'main_category',
+                                           'sub_cat_3': 'sub_category'})
+
+
+litter_ct_brands['sub_category'] = litter_ct_brands['sub_category'].str.strip()
+
+litter_ct_brands_piv = litter_ct_brands.groupby('sub_category').agg(
+     litter_count = pd.NamedAgg(column = 'value', aggfunc='sum')
+).reset_index()
+
+litter_ct_brands_piv = litter_ct_brands_piv.sort_values(by = 'litter_count', ascending=False).reset_index()
+
+#litter_ct_brands_piv = litter_ct_brands_piv.loc[litter_ct_brands_piv['litter_count'] >= 5]
+
+litter_ct_brands_piv = litter_ct_brands_piv[['sub_category', 'litter_count']]
+litter_ct_brands_piv = litter_ct_brands_piv.rename(columns = {'sub_category':'Brand Name',
+                                                'litter_count': 'Litter Count'})
+
+litter_ct_other = litter_customtag.loc[litter_customtag['sub_cat_2'] == 'other']
+litter_ct_other = litter_ct_other[['id', 'sub_cat_2', 'sub_cat_3', 'value']]
+litter_ct_other = litter_ct_other.rename(columns = {'sub_cat_2': 'main_category',
+                                           'sub_cat_3': 'sub_category'})
+
 # remove the custom tag columns from the main dataset
-litter = litter.loc[:,~litter.columns.str.startswith('custom_tag')]
-litter = litter.loc[~litter['id'].isin(litter_customtag['id'])]
+#litter = litter.loc[:,~litter.columns.str.startswith('custom_tag')]
+#litter = litter.loc[~litter['id'].isin(litter_customtag['id'])]
+
+#%%
+# create chart for brand names
+'''
+bn_chart = px.bar(litter_ct_brands_piv, x = 'litter_count', 
+             y= 'sub_category',
+             color='litter_count',
+             color_continuous_scale=['steelblue', 'darkorange'],
+             hover_data={'litter_count': True,
+                         'sub_category': False},
+             labels={'litter_count': 'Litter Count'},)
+bn_chart.update_layout(yaxis=dict(autorange = 'reversed'))
+bn_chart.update_layout(yaxis_title=None, 
+                  xaxis_title = 'Brands Tagged with 5 Or More Litter Count', 
+                  plot_bgcolor = 'lightgrey')
+'''
 
 
 #%%
@@ -193,7 +199,7 @@ col_names = col_names.dropna()
 col_names_index = col_names.index.tolist()
 
 # %%
-#litter_base = litter.loc[:, base_columns]
+litter_base = litter.loc[:, base_columns]
 
 
 
@@ -250,8 +256,7 @@ litter_industrial = litter.iloc[:,col_names_index[8]:col_names_index[9]]
 litter_industrial = clean_subset(litter_industrial, 'industrial')
 
 
-# litter_brands = litter.iloc[:,col_names_index[9]:col_names_index[10]]
-# litter_brands = clean_subset(litter_brands, 'brands')
+#litter_brands = litter_ct_brands
 
 
 litter_dogshit = litter.iloc[:,col_names_index[10]:col_names_index[11]]
@@ -273,10 +278,12 @@ litter_other['sub_category'] = (litter_other['sub_category']
 litter_other['sub_category'] = (litter_other['sub_category']
                                 .str.replace('balloons.1', 'balloons', regex=False))
 
+litter_other = pd.concat([litter_other, litter_ct_other])
+
 #%% Combine data subsets into one data frame
 litter_categories = pd.concat([litter_smoking, litter_food, litter_coffee, litter_alcohol,
                                litter_softdrinks, litter_sanitary, litter_coastal, litter_dumping,
-                               litter_industrial, litter_dogshit, litter_other, litter_customtag], axis= 0)
+                               litter_industrial, litter_dogshit, litter_other], axis= 0)
 # %% Delete all the data frames and clear memory
 
 del [[litter_smoking, litter_food, litter_coffee, litter_alcohol, litter_softdrinks,
@@ -299,138 +306,285 @@ litter['sub_category'] = litter['sub_category'].str.title()
 ###################################################### < Create a subset for 5 and 6 components   > ####################################################
 ###################################################### < Create a subset for 5 and 6 components   > ####################################################
 
+#%%
+# Create place name address reference table
+
+place_name_address = [['L&M Mighty Shop', '504']
+                      ,['La Petite Academy', '1504']
+                      ,['Elizabeth Tate Alternative High School', '1528']
+                      ,['Four Seasons Car Wash', '1455']
+                      ,['Periodontal Associates', '1517']
+                      ,['Mergen Orthodontics', '1540']
+                      ,['Lower Muscatine @ Mall Dr', '1800']
+                      ,['Lower Muscatine Ave @ Iowa City Maketplace', '1600']
+                      ,['Kirkwood Community College - Iowa City Campus', '1816']
+                      ,['Sports Column', '12']
+                      ,['Assembly of God Church', '800']
+                      ,['Deli Mart', '1700']
+                      ,['First Christian Church', '200']
+                      ,['Iowa City Public Library', '123']
+                      ,["Jimmy Jack's Rib Shack", '1940']
+                      ,['JOANN Fabrics and Crafts', '1676']
+                      ,["McDonald's", '1861']
+                      ,["Bradley's Cleaners", '19030']
+                      ,['Oyama Sushi', '1853']
+                      ,['Select Physical Therapy', '1555']
+                      ,['Southeast Junior High School', '2501']
+                      ,['Spenler Tire', '1455']
+                      ,['Sycamore Mall', '1660']
+                      ,['The Record Collector', '116']
+                      ,['Wells Fargo', '103']
+                      ,["Sueppel's Flowers", '1501']]
+
+place_name_add_df = pd.DataFrame(place_name_address, columns = ['place_name', 'st_add'])
+                      
+#%%
+street_suffix = ['Avenue', 'Ave', 'Street', 'St', 'Road', 'Rd', 'Drive', 'Dr', 'Boulevard', 'Blvd',
+                 'Lane', 'Ln', 'Circle', 'Place', 'Pl', 'Court', 'Ct']
+
+city_list = ['Iowa City', 'Coralville', 'Des Moines']
+
+state_list = ['Iowa', 'Illinois']
+
+#%%
+
+address_cleanup = litter[['address']]
+address_cleanup['split_count'] = address_cleanup['address'].str.count(',')
+max_split = address_cleanup['split_count'].max()
+
+address_cleanup[['split_1','split_2','split_3','split_4', 'split_5',
+      'split_6', 'split_7', 'split_8', 'split_9']] = address_cleanup['address'].str.split(',', expand = True)
 
 
-#%% Identify number of commas, or components in the address
-litter_base['comma_count'] = litter_base['address'].str.count(',')
+address_cleanup = pd.merge(address_cleanup, litter['id'], how = 'left', left_index=True, right_index=True)
 
-# test for the number of components in the address. If it something other than 5 or 6, it will not work with this code.
 
-test_comma_counts = pd.DataFrame(litter_base.groupby('comma_count').size()).reset_index()
+#%%
 
-# create list of expected values 5 and 6.
+''' Create a dataframe with a combined list of all splits, but in a column. So all split values are in one column, 
+a label for which split the value is in, and then a label identifying which part of the address. This will then be re put 
+back togehter in a row format.
 
-expected_vals = [5,6]
+COL 1: Litter ID
+COL 2: VALUES FROM EACH OF THE SPLITS
+COL 3: LABEL TO IDENTIFY WHAT PART OF THE ADDRESS THE SPLIT IS.
 
-actual_vals = test_comma_counts['comma_count'].tolist()
+THEN SPREAD ACROSS COLUMNS BY THE LABEL IN NEW DATA FRAME.
 
-test_list = []
-for val in actual_vals:
-    if(val in expected_vals):
-        test_list.append(0)
+'''
+
+
+split_1 = address_cleanup[['id', 'split_1']]
+split_1['split_label'] = 'split_1'
+split_1 = split_1.rename(columns = {'split_1': 'split_value'})
+
+split_2 = address_cleanup[['id', 'split_2']]
+split_2['split_label'] = 'split_2'
+split_2 = split_2.rename(columns = {'split_2': 'split_value'})
+
+split_3 = address_cleanup[['id', 'split_3']]
+split_3['split_label'] = 'split_3'
+split_3 = split_3.rename(columns = {'split_3': 'split_value'})
+
+split_4 = address_cleanup[['id', 'split_4']]
+split_4['split_label'] = 'split_4'
+split_4 = split_4.rename(columns = {'split_4': 'split_value'})
+
+split_5 = address_cleanup[['id', 'split_5']]
+split_5['split_label'] = 'split_5'
+split_5 = split_5.rename(columns = {'split_5': 'split_value'})
+
+split_6 = address_cleanup[['id', 'split_6']]
+split_6['split_label'] = 'split_6'
+split_6 = split_6.rename(columns = {'split_6': 'split_value'})
+
+split_7 = address_cleanup[['id', 'split_7']]
+split_7['split_label'] = 'split_7'
+split_7 = split_7.rename(columns = {'split_7': 'split_value'})
+
+split_8 = address_cleanup[['id', 'split_8']]
+split_8['split_label'] = 'split_8'
+split_8 = split_8.rename(columns = {'split_8': 'split_value'})
+
+split_9 = address_cleanup[['id', 'split_9']]
+split_9['split_label'] = 'split_9'
+split_9 = split_9.rename(columns = {'split_9': 'split_value'})
+
+comb_splits = pd.concat([split_1, split_2, split_3, split_4, split_5, split_6, split_7, split_8, split_9],
+                        ignore_index=True)
+
+comb_splits['split_value'] = comb_splits['split_value'].str.strip()
+
+comb_splits['split_value'] = comb_splits['split_value'].str.replace('US-IA', 'USA', regex=False)
+comb_splits['split_value'] = comb_splits['split_value'].str.replace('1/2', '', regex=False)
+
+#%%
+comb_splits['is_number'] = ''
+for i in range(len(comb_splits['split_value'])):
+    if comb_splits.loc[i,'split_value'] is None:
+        comb_splits.loc[i,'is_number'] = 'NONE'
+
+    #elif comb_splits[i,'split_value']
+
+    elif re.findall(r'\d+', comb_splits.loc[i,'split_value']) != []:
+        comb_splits.loc[i,'is_number'] = re.findall(r'\d+', comb_splits.loc[i,'split_value'])[0]
+    
     else:
-        test_list.append(1)
-
-test_list_sum = sum(test_list)
-
-# Create exception
-
-class NewCommaCountException(Exception):
-    'Raised when there is an address that does not have 5 or 6 commas.'
-    pass
-
-# if test_list_sum is greater than 0, then throw an error and pring the comma counts
-
-try:
-    if test_list_sum > 0:
-        raise NewCommaCountException
-except NewCommaCountException:
-    print('Check for addresses with comma count not equal to 5 or 6.')
-    print(test_comma_counts)
-
-# %% Create subset fo 5 components
-
-litter_add_5 = litter_base.loc[litter_base['comma_count'] == 5]
-litter_add_5 = litter_add_5[['id', 'address']]
-
-litter_add_5[['add_street', 'add_city', 'add_county', 'add_state', 'add_zip', 'add_country']] = litter_add_5['address'].str.split(',',expand= True)
-
-litter_add_5['add_num'] = np.nan
-
-litter_add_5 = litter_add_5[['id', 'address', 'add_num', 'add_street', 'add_city', 'add_county', 'add_state', 'add_zip', 'add_country']]
+        comb_splits.loc[i,'is_number'] = "NA"
 
 
 
+comb_splits['is_text'] = ''
+for i in range(len(comb_splits['split_value'])):
+    if comb_splits.loc[i,'split_value'] is None:
+        comb_splits.loc[i,'is_text'] = 'NONE'
+
+    elif re.findall(r'\D+', comb_splits.loc[i,'split_value']) != []:
+        comb_splits.loc[i,'is_text'] = re.findall(r'\D+', comb_splits.loc[i,'split_value'])[0]
+    
+    else:
+        comb_splits.loc[i,'is_text'] = "NA"
 
 
-# %% Create subset fo 6 components
+comb_splits['last_word'] = comb_splits['split_value'].str.split(" ").str[-1]
 
-litter_add_6 = litter_base.loc[litter_base['comma_count'] == 6]
-litter_add_6 = litter_add_6[['id', 'address']]
 
-litter_add_6[['add_num', 'add_street', 'add_city', 'add_county', 'add_state', 'add_zip', 'add_country']] = litter_add_6['address'].str.split(',',expand=True)
+comb_splits['is_street'] = ''
+for i in range(len(comb_splits['split_value'])):
+    if comb_splits.loc[i,'split_value'] is None:
+        comb_splits.loc[i,'is_street'] = 'NONE'
 
-litter_add_6 = litter_add_6[['id', 'address', 'add_num', 'add_street', 'add_city', 'add_county', 'add_state', 'add_zip', 'add_country']]
+    else:
+        comb_splits.loc[i,'is_street'] = comb_splits.loc[i,'last_word'] in street_suffix
 
-# %% combine data sets back to 1 data set
 
-litter_add_final = pd.concat([litter_add_5, litter_add_6])
+#%%
 
-# sort by row index value
-litter_add_final = litter_add_final.sort_index() 
+comb_splits['split_category'] = ''
+for i in range(len(comb_splits['split_value'])):
+                   if comb_splits.loc[i,'split_value'] is None:
+                    comb_splits.loc[i,'is_street'] = 'NONE'
+                    comb_splits.loc[i,'split_category'] = 'NONE'
 
-litter_add_final['add_street'] = litter_add_final['add_street'].apply(lambda x: x.strip())
+                   elif pd.to_numeric(comb_splits['is_number'][i], errors='coerce') > 50000:
+                       comb_splits.loc[i,'split_category'] = 'zip'
+
+                   elif (comb_splits.loc[i, 'is_number'] != 'NA' and comb_splits.loc[i,'is_text'] == 'NA') or (comb_splits.loc[i, 'is_number'] != 'NA' and comb_splits.loc[i,'is_text'] == ' ') :
+                       comb_splits.loc[i,'split_category'] = 'address_number'
+                    
+                   elif comb_splits.loc[i, 'is_street'] == True:
+                       comb_splits.loc[i,'split_category'] = 'street_address'
+                    
+                   elif comb_splits.loc[i, 'split_value'] in city_list:
+                       comb_splits.loc[i,'split_category'] = 'city'
+                    
+                   elif comb_splits.loc[i, 'last_word'] == 'County':
+                       comb_splits.loc[i,'split_category'] = 'county'
+                   
+                   elif comb_splits.loc[i, 'is_text'] in state_list:
+                       comb_splits.loc[i,'split_category'] = 'state'
+
+                   elif comb_splits.loc[i, 'is_text'] == 'USA':
+                       comb_splits.loc[i,'split_category'] = 'country'
+                   
+
+                   else: comb_splits.loc[i,'split_category'] = 'place_name'
+                        
+#%%
+
+comb_splits_fin = comb_splits[['id','split_label','split_value', 'split_category']]
+comb_splits_fin['id'] = comb_splits_fin['id'].astype('string')
+
+comb_splits_fin_w = comb_splits_fin.pivot_table(index='id', columns='split_category', values='split_value', aggfunc='max')
+
+comb_splits_fin_w = comb_splits_fin_w[['address_number','place_name','street_address', 'city', 'county','state','country']]
+
+
+comb_splits_fin_w = comb_splits_fin_w.reset_index()
+
+comb_splits_fin_w = pd.merge(comb_splits_fin_w, place_name_add_df, 
+                             how='left', left_on='place_name', right_on = 'place_name')
+
+comb_splits_fin_w.loc[comb_splits_fin_w['address_number'].isnull(),'address_number'] = comb_splits_fin_w['st_add']
+
+comb_splits_fin_w = comb_splits_fin_w.drop('st_add', axis=1)
+
 
 
 # %% Aggregate by block number
 
 # create new df named 'add_num' to identify if the value in the 'add_num' field is a number or text. 
 # If it is a number, put in column 'add_is_num', if it is text put it in column 'add_is_text'.
-add_num = litter_add_final['add_num'].str.extract('(?P<add_is_num>\d+)?(?P<add_is_text>\D+)?').fillna('')
-# format column 'add_is_num' as an integer. 
-add_num['add_is_num'] = pd.to_numeric(add_num['add_is_num'], errors = 'coerce', downcast = 'integer', )
-# create new column, 'add_block_num' by rounding the address number.
-add_num['add_block_num'] = round(add_num['add_is_num']/100,0)*100
-# for column 'add_block_num', fill na's with the 'add_is_text' field
-add_num['add_block_num'] = add_num['add_block_num'].fillna(add_num['add_is_text']) 
-# remove .0 from the number
-add_num['add_block_num'] = add_num['add_block_num'].astype(str).apply(lambda x: x.replace('.0',''))
-# if the address number = 0, change to 10
-add_num['add_block_num'] = add_num['add_block_num'].replace('0','10')
 
+comb_splits_fin_w['add_block_num'] = np.floor(comb_splits_fin_w['address_number'].astype(float)/100)
+comb_splits_fin_w['add_block_num'] = comb_splits_fin_w['add_block_num'].astype(str).apply(lambda x: x.replace('.0',''))
+comb_splits_fin_w['add_block_num'] = comb_splits_fin_w['add_block_num'].replace('0','10')
 
-
-# %%
+ # %%
+'''
 litter_add_final = pd.concat([litter_add_final, add_num], axis=1)
 litter_add_final['add_blocknum_street'] = litter_add_final['add_block_num'].astype(str) + ' ' + litter_add_final['add_street']
 
 litter_add_final = litter_add_final[['id', 'add_num', 'add_street', 'add_city', 'add_county', 'add_state', 'add_zip', 'add_country', 'add_block_num', 'add_blocknum_street']]
 
 litter = pd.merge(litter, litter_add_final, on = 'id', how = 'left')
+'''
+#%%
+
+litter = pd.merge(litter, comb_splits_fin_w, how = 'left', 
+                       left_on = litter['id'].astype('str'), 
+                       right_on=comb_splits_fin_w['id'].astype('str'))
+
+litter = litter.drop(['id_y', 'key_0'],axis=1)
+litter = litter.rename(columns = {'id_x': 'id'})
+
+litter['add_block_num_st'] = litter['add_block_num'] + ' ' + litter['street_address']
 
 
 # %%
 # create new dataframe, 'df_latlon' to get the minimum latitude and minimum longitude by block
-df_latlon = litter[['add_blocknum_street', 'lat', 'lon']]
-df_latlon = df_latlon.groupby('add_blocknum_street')[['lat', 'lon']].min().reset_index()
+df_latlon = litter[['add_block_num_st', 'lat', 'lon']]
+df_latlon = df_latlon.groupby('add_block_num_st')[['lat', 'lon']].min().reset_index()
 df_latlon = df_latlon.rename(columns = {'lat': 'min_lat', 'lon': 'min_lon'})
 
-litter = pd.merge(litter, df_latlon, on = 'add_blocknum_street', how = 'left')
-
+litter = pd.merge(litter, df_latlon, on = 'add_block_num_st', how = 'left')
 
 # %%
 # create pivot table 'st_count' to show the number of times litter was picked up on that block
-st_count = pd.DataFrame(litter.groupby(['add_blocknum_street'])['date_taken_date'].nunique()).reset_index()
+st_count = pd.DataFrame(litter.groupby(['add_block_num_st'])['date_taken_date'].nunique()).reset_index()
 st_count = st_count.rename(columns = {'date_taken_date': 'total_count_pickup_dates'})
 # %%
 # create pivot table 'litter_sum' to show the total litter picked up at each block
-litter_sum = pd.DataFrame(litter.groupby(['add_blocknum_street'])['litter_count'].sum()).reset_index()
+litter_sum = pd.DataFrame(litter.groupby(['add_block_num_st'])['litter_count'].sum()).reset_index()
 litter_sum = litter_sum.rename(columns = {'litter_count':'total_litter_pickedup'})
 
 # %%
 # join 'st_count' to 'litter_sum' using left join on 'add_blocknum_street'
-litter_sum = pd.merge(litter_sum, st_count, on = 'add_blocknum_street', how = 'left')
+litter_sum = pd.merge(litter_sum, st_count, on = 'add_block_num_st', how = 'left')
 # calculate the average total litter picked up at each block per date
 litter_sum['avg_litter_pickedup'] = round((litter_sum['total_litter_pickedup']) / (litter_sum['total_count_pickup_dates']),1)
 
 
 # join the 'df_latlon' to 'litter_sum' to facilitate litter density on a street map
-litter_sum = pd.merge(litter_sum, df_latlon, on = 'add_blocknum_street', how = 'left')
+litter_sum = pd.merge(litter_sum, df_latlon, on = 'add_block_num_st', how = 'left')
 
 
+#%% create place_name chart
 
-litter=litter.rename(columns = {'value': 'litter_count'})
+pl_name = litter[['id', 'place_name', 'litter_count']]
 
+pl_name = pl_name.dropna(axis = 0).reset_index()
+
+pl_name = pl_name[['place_name', 'litter_count']]
+
+pl_name = pl_name.groupby(['place_name']).agg(
+     litter_count = pd.NamedAgg(column = 'litter_count', aggfunc='sum')
+)
+
+pl_name = pl_name.sort_values('litter_count', ascending=False).reset_index()
+pl_name_fin = pl_name[['place_name', 'litter_count']]
+pl_name_fin = pl_name_fin.rename(columns = {'place_name': 'Business Location',
+                                            'litter_count': 'Litter Count'})
 
 #%%
 ###################################################### < Step 6: Get Litter Pickup Durations       > ####################################################
@@ -450,7 +604,7 @@ def update_time(myid, mydate):
     myindex = durations.index[durations['id'] == myid].tolist()
     durations.loc[myindex, 'date_taken'] = mydate
 
-durations = litter[['id', 'date_taken_date', 'date_taken', 'litter_count']]
+durations = litter[['id', 'phone', 'date_taken_date', 'date_taken', 'litter_count']]
 # June 23, 2024
 
 update_time(myid = 505104, mydate = '2024-06-23 15:02:00')
@@ -539,11 +693,12 @@ durations['pick_up_event'] = durations['date_taken_date'].astype(str) + '_' + du
 #%% Aggregation
 # get the earliest time stamp, the latest time stamp, and the sum of the litter count for each litter pick up event.
 
-durations_piv = durations.groupby(['pick_up_event']).agg(min_date = ('date_taken', np.min),
-                                                 max_date = ('date_taken', np.max),
-                                                 sum_litter = ('litter_count', np.sum)).reset_index()
-
-
+                                                
+durations_piv = durations.groupby(['pick_up_event', 'phone']).agg(
+    min_date=pd.NamedAgg(column="date_taken", aggfunc="min"),
+    max_date=pd.NamedAgg(column="date_taken", aggfunc="max"),
+    sum_litter=pd.NamedAgg(column="litter_count", aggfunc="sum")
+)
 
 #%% get durations
 
@@ -567,10 +722,7 @@ avg_litter_per_min = round(durations_piv['litter_per_min'].mean(),0).astype(int)
 
 #%% clean up environment
 
-del actual_vals, add_num, base_columns, col_names, col_names_all, col_names_index, conditions
-del df_latlon, durations, expected_vals, fmt, i, input_char, litter_add_5, litter_add_6, litter_add_final 
-del litter_base, litter_categories, results, st_count, str_orig
-del test_comma_counts, test_list, test_list_sum, val
 
 
-# %%
+
+
