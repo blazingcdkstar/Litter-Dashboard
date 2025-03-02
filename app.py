@@ -1,10 +1,13 @@
 
 
 #%% load libraries
+# dash libraries
 from dash import Dash, dcc, html, Input, Output, dash_table # pip install dash
 import dash_bootstrap_components as dbc 
 from dash.exceptions import PreventUpdate
 from dash_iconify import DashIconify
+from dash import dash_table
+import dash_ag_grid as dag
 
 
 
@@ -21,6 +24,7 @@ import plotly.express as px
 
 # load data wrangling module
 import app_data as ad
+#from app_data import pl_name
 
 # for heroku app
 import pathlib
@@ -31,6 +35,11 @@ DATA_PATH = PATH.joinpath('data').resolve()
 #%% load data
 df = ad.litter
 df_piv = ad.litter_sum
+brands = ad.litter_ct_brands_piv
+places = ad.pl_name_fin
+
+columnDefs = [{"field": i} for i in ["Business Location", "Litter Count"]]
+columnDefsBrands = [{"field": i} for i in ["Brand Name", "Litter Count"]]
 
 #%% create function
 
@@ -62,7 +71,7 @@ color_discrete_map = {'Softdrinks': '#3366CC',
 total_litter = df['litter_count'].sum()
 total_litter = int(total_litter)
 
-bag_count = 17
+bag_count = 30
 
 total_softdrinks = mysum('Softdrinks')
 total_food = mysum('Food')
@@ -87,11 +96,11 @@ df_piv_three = df_piv[df_piv['total_count_pickup_dates'] >= 3].nlargest(10, 'avg
 
 
 density_bar_three = px.bar(df_piv_three, x='avg_litter_pickedup', 
-       y= 'add_blocknum_street',
-       hover_data={'add_blocknum_street': True,
+       y= 'add_block_num_st',
+       hover_data={'add_block_num_st': True,
                    'avg_litter_pickedup': True,
                    'total_count_pickup_dates': True},
-        labels={'add_blocknum_street': 'Street Block',
+        labels={'add_block_num_st': 'Street Block',
                 'avg_litter_pickedup': 'Average Litter Picked Up',
                 'total_count_pickup_dates': 'Count of Outings'},
         color = 'avg_litter_pickedup',
@@ -110,13 +119,13 @@ density_fig = px.scatter_mapbox(df_piv_three, lat="min_lat", lon="min_lon",
                         #size = df_piv_three['avg_litter_pickedup'] * 2,
                         color_continuous_scale=['steelblue', 'darkorange'],
                         #color_continuous_midpoint=10,
-                        zoom=13,
+                        zoom=12,
                         hover_data={'avg_litter_pickedup': True,
                                     'min_lat': False,
                                     'min_lon': False,
-                                    'add_blocknum_street': True,
+                                    'add_block_num_st': True,
                                     'total_count_pickup_dates': True},
-                        labels = {'add_blocknum_street': 'Street Block',
+                        labels = {'add_block_num_st': 'Street Block',
                                   'total_count_pickup_dates': 'Count of Outings',
                                   'avg_litter_pickedup': 'Average Litter Picked Up'}
                         )
@@ -135,11 +144,11 @@ duration_scatter = px.scatter(ad.durations_piv,
            size = 'sum_litter',
            color = 'sum_litter',
            color_continuous_scale=['steelblue', 'darkorange'],
-           hover_data={'pick_up_event': True,
+           hover_data={'min_date': True,
                        'duration_mins': True,
                        'sum_litter': True
                    },
-           labels={'pick_up_event': 'Date',
+           labels={'min_date': 'Date',
                    'duration_mins': 'Time to Pick Up Litter in Minutes',
                    'sum_litter': 'Total Litter Picked Up'
                 },
@@ -212,8 +221,30 @@ app.layout = html.Div([
 
     html.Br(),
 
-    html.H1('Litter and Litter Data Collected in Iowa City',
-            style={'textAlign':'center'}),
+    dbc.Col([
+
+        
+        
+        #dbc.Row([html.H1('Litter and Litter Data Collected in Iowa City'),
+        #                #html.Img(src = "/assets/bottle.jpg")
+        #                   ], className = "banner"),
+        
+        dbc.Row([
+                dbc.CardImg(src="/assets/logo.jpg", bottom=True,                             
+                            style = {'height':'30%',
+                            'width': '40%',
+                             }
+                ), 
+
+
+        ], justify = 'center')
+    ]),
+        
+    
+
+
+    #html.H1('Litter and Litter Data Collected in Iowa City',
+    #        style={'textAlign':'center'}),
 
     html.Br(),
 
@@ -232,6 +263,32 @@ app.layout = html.Div([
                                
                                 DashIconify(icon="f7:trash",
                                     width=30), 
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
+                                DashIconify(icon="f7:trash",
+                                    width=30),
                                 DashIconify(icon="f7:trash",
                                     width=30),
                                 DashIconify(icon="f7:trash",
@@ -491,11 +548,11 @@ app.layout = html.Div([
                     [
                         dbc.Row([
                             dbc.Col([
-                                html.H4('Sanitary, Industrial, and Custom', className='card-title'),
+                                html.H4('Sanitary and Custom', className='card-title'),
                                 DashIconify(icon="f7:facemask",
                                     width=30),
-                                    DashIconify(icon="mdi:industrial",
-                                    width=30),
+                                    #DashIconify(icon="mdi:industrial",
+                                    #width=30),
                                     DashIconify(icon="fluent:phone-48-regular",
                                     width=30)
                             ]),
@@ -543,6 +600,82 @@ app.layout = html.Div([
         ], xs=8, sm=8, md=12, lg=6, xl=5),
     
     html.Br(),
+
+    #html.H1('Business Locations and Brands',
+    #        style = {'textAlign': 'center'}),
+    html.Br(),
+    html.Br(),
+    
+
+    dbc.Row([
+
+        dbc.Col([html.H2("Business Locations With Litter"),
+
+            dag.AgGrid(
+                id = 'test_pagination_grid',
+                columnDefs = columnDefs,
+                rowData = places.to_dict('records'),
+                #columnSize = 'sizeToFit',
+                defaultColDef={'filter': True,
+                               'sortable': True,
+                               'minWidth': 450},
+                rowStyle={"backgroundColor": "darkgrey", "color": "white"},
+                dashGridOptions = {"pagination": True, 
+                "paginationPageSize": 10,
+                "suppressPaginationPanel": False,
+                "suppressScrollOnNewData": False,
+                "animateRows": False},
+                className="ag-theme-alpine",
+                style={
+                "height": "550px",
+                "width": "50%",
+            },
+                
+            ), 
+
+            html.Br(),
+            html.Br(),            
+
+    ]),
+
+    html.Br(),
+    html.Br(),
+
+     dbc.Col([html.H2("Brands Littered"),
+              
+            dag.AgGrid(
+                id = 'test_pagination_grid_brands',
+                columnDefs = columnDefsBrands,
+                rowData = brands.to_dict('records'),
+                #columnSize = 'sizeToFit',
+                defaultColDef={'filter': True,
+                               'sortable': True,
+                               'minWidth': 450},
+                rowStyle={"backgroundColor": "darkgrey", "color": "white"},
+                #className = 'ag-theme-alpine',
+                dashGridOptions = {"pagination": True, 
+                "paginationPageSize": 10,
+                "suppressPaginationPanel": False,
+                "suppressScrollOnNewData": False,
+                "animateRows": False},
+                className="ag-theme-alpine",
+                style={
+                "height": "550px",
+                "width": "50%",
+            },
+                
+                
+            )             
+
+    ]),
+
+       
+    ]),
+
+    html.Br(),
+    html.Br(),
+    html.Br(),
+    html.Br(),
     
      html.H1('Litter Quantity versus Time - How long does it take to pick up litter?',
             style = {'textAlign': 'center'}), 
@@ -559,6 +692,10 @@ app.layout = html.Div([
         dbc.Col(card_duration, width=4,
                 )]
     ),
+
+ 
+    html.Br(),
+    html.Br(),
 
     html.H1('Litter Location, Composition and Timeline Based on Your Selections',
             style = {'textAlign': 'center'}), 
@@ -579,6 +716,8 @@ app.layout = html.Div([
                                                                                       'height': '100%',
                                                                                       'font-size': 25}),
 
+    html.Br(),
+    
     html.Br(),
 
     html.H5('Select the date range.'),    
@@ -657,6 +796,30 @@ app.layout = html.Div([
                                                    "autoScale2d" "select2d", "lasso2d"]}),   
     
    
+    html.Br(),
+
+        dbc.Row([
+                dbc.CardImg(src="/assets/bottle.jpg", bottom=True,                             
+                            style = {'height':'10%',
+                            'width': '10%',
+                             }
+                ), 
+                dbc.CardImg(src="/assets/bottle.jpg", bottom=True,                             
+                            style = {'height':'10%',
+                            'width': '10%',
+                             }
+                ),
+                dbc.CardImg(src="/assets/bottle.jpg", bottom=True,                             
+                            style = {'height':'20%',
+                            'width': '10%',
+                             }
+                ),
+
+
+        ], justify='center')
+
+
+
 ])
 
 #%% Map Chart
@@ -664,6 +827,7 @@ app.layout = html.Div([
               Input('litter_type_dd','value'),
               Input('date_range', 'start_date'),
               Input('date_range', 'end_date'))
+              #Input('top_10_filter', 'value'))
 
 
 def density_map(mycategory, start_date, end_date):
@@ -678,13 +842,11 @@ def density_map(mycategory, start_date, end_date):
                                                                  pd.to_datetime(end_date),
                                                                  inclusive='both')]
     
-    
-    
-    
+  
     fig = px.scatter_mapbox(temp_df, lat="lat", lon="lon",    
                             color="main_category", 
                             size="litter_count",
-                            zoom=13,
+                            zoom=11,
                             color_discrete_map=color_discrete_map,
                             hover_data={'litter_count': True,
                                     'lat': False,
@@ -711,12 +873,12 @@ def density_map(mycategory, start_date, end_date):
               Input('litter_type_dd','value'),
               Input('date_range', 'start_date'),
               Input('date_range', 'end_date'))
+              #Input('top_10_filter', 'value'))
 
 def sunburst_chart(mycategory, start_date, end_date):
 
     if not start_date or not end_date or not mycategory:
         raise PreventUpdate
-    
     
         
    
@@ -726,6 +888,9 @@ def sunburst_chart(mycategory, start_date, end_date):
     temp_df = temp_df.loc[temp_df['date_taken_date'].between(pd.to_datetime(start_date), 
                                                                  pd.to_datetime(end_date),
                                                                  inclusive='both')]
+    
+    # if my_add_blocknum:
+    #     temp_df = temp_df.loc[temp_df['add_blocknum_street'].eq(my_add_blocknum)]
     
     temp_piv = pd.DataFrame(temp_df.groupby(['main_category', 'sub_category'])['litter_count'].sum().reset_index())
 
@@ -758,6 +923,7 @@ def sunburst_chart(mycategory, start_date, end_date):
               Input('litter_type_dd','value'),
               Input('date_range', 'start_date'),
               Input('date_range', 'end_date'))
+              #Input('top_10_filter', 'value'))
 
 
 
@@ -772,6 +938,9 @@ def get_my_table(mycategory, start_date, end_date):
     mytable = mytable.loc[mytable['date_taken_date'].between(pd.to_datetime(start_date), 
                                                                  pd.to_datetime(end_date),
                                                                  inclusive='both')]
+    
+    # if top_10_filter:
+    #     mytable = mytable.loc[mytable['add_blocknum_street'].eq(top_10_filter)]
     
     mytable = pd.DataFrame(mytable.groupby(['main_category'])['litter_count'].sum().reset_index())
     mytable = mytable.sort_values(by = 'litter_count', ascending=False)
@@ -811,9 +980,10 @@ def my_bar_chart(mycategory, start_date, end_date):
     
     temp_df = pd.DataFrame(temp_df.groupby(['date_taken_date', 'main_category'])['litter_count'].sum().reset_index())
 
-    fig = px.bar(temp_df,
+    fig = px.line(temp_df,
              x='date_taken_date',
              y = 'litter_count',
+             markers=True,
             hover_data={'date_taken_date': True,
                         'main_category' : True,
                          'litter_count': True},
